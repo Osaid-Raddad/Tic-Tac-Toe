@@ -90,9 +90,10 @@ const alphaBetaSearch = (
  * @param {string} aiPlayer - AI player symbol
  * @param {Function} evaluateFunction - Evaluation function
  * @param {number} maxDepth - Search depth
+ * @param {string} difficulty - Difficulty level ('easy', 'normal', 'hard')
  * @returns {Object} - Best move and its evaluation
  */
-export const findBestMove = (board, aiPlayer, evaluateFunction, maxDepth) => {
+export const findBestMove = (board, aiPlayer, evaluateFunction, maxDepth, difficulty = 'normal') => {
   const legalMoves = getLegalMoves(board);
   let bestMove = null;
   let bestValue = -Infinity;
@@ -117,6 +118,18 @@ export const findBestMove = (board, aiPlayer, evaluateFunction, maxDepth) => {
       bestValue = moveValue;
       bestMove = move;
     }
+  }
+  
+  // Easy mode: Sometimes make random moves (50% chance)
+  if (difficulty === 'easy' && Math.random() < 0.5) {
+    bestMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+  }
+  // Easy mode: Sometimes pick a suboptimal move (30% of remaining time)
+  else if (difficulty === 'easy' && Math.random() < 0.3 && moveEvaluations.length > 1) {
+    // Sort and pick second or third best move
+    const sorted = [...moveEvaluations].sort((a, b) => b.value - a.value);
+    const randomIndex = Math.floor(Math.random() * Math.min(3, sorted.length));
+    bestMove = sorted[randomIndex].move;
   }
   
   return { bestMove, bestValue, moveEvaluations };

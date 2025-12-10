@@ -3,25 +3,57 @@
  * Uses trained weights based on game features
  */
 
-import { isTerminal, getOpponent, extractFeatures } from './gameLogic';
+import { isTerminal, getOpponent } from './gameLogic';
+import { extractDatasetFeatures } from './featureExtractor';
 
 /**
- * Trained weights for ML model (simulated training on Tic-Tac-Toe dataset)
- * These weights are based on feature importance for predicting game outcomes
- * In a real scenario, these would be trained using a dataset of game outcomes
+ * Default trained weights for ML model (matches dataset features)
+ * Format: [x_count, o_count, x_almost_win, o_almost_win, x_center, x_corners]
  */
-const TRAINED_WEIGHTS = {
-  playerMarks: 2.5,
-  opponentMarks: -2.5,
-  playerTwoInRow: 18.0,
-  opponentTwoInRow: -22.0,
-  playerOneInRow: 4.5,
-  opponentOneInRow: -4.5,
-  centerControl: 6.0,
-  playerCorners: 3.5,
-  opponentCorners: -3.5,
+let MODEL_WEIGHTS = {
   bias: 0.5,
+  weights: [2.5, -2.5, 18.0, -22.0, 6.0, 3.5] // Default weights
 };
+
+/**
+ * Update ML weights with trained model
+ * @param {Object} model - Trained model with weights
+ */
+export const updateMLWeights = (model) => {
+  if (model && model.featureWeights && model.featureWeights.length >= 6) {
+    MODEL_WEIGHTS = {
+      bias: model.bias || 0,
+      weights: model.featureWeights
+    };
+    
+    // Save to localStorage for persistence
+    localStorage.setItem('ml_model', JSON.stringify(MODEL_WEIGHTS));
+    console.log('✅ ML Model Updated:', MODEL_WEIGHTS);
+  }
+};
+
+/**
+ * Load weights from localStorage if available
+ */
+export const loadSavedWeights = () => {
+  try {
+    const saved = localStorage.getItem('ml_model');
+    if (saved) {
+      MODEL_WEIGHTS = JSON.parse(saved);
+      console.log('📦 Loaded saved model:', MODEL_WEIGHTS);
+      return true;
+    }
+  } catch (error) {
+    console.error('Failed to load saved weights:', error);
+  }
+  return false;
+};
+
+/**
+ * Get current ML weights
+ * @returns {Object} - Current weights
+ */
+export const getCurrentWeights = () => MODEL_WEIGHTS;
 
 /**
  * Evaluate board using ML-based approach
@@ -39,20 +71,32 @@ export const mlEvaluate = (board, player) => {
     return 0; // Draw
   }
   
-  // Extract features from board
-  const features = extractFeatures(board, player);
+  // Extract features matching dataset format
+  const features = extractDatasetFeatures(board, player);
   
-  // Calculate weighted sum (linear model)
-  let score = TRAINED_WEIGHTS.bias;
-  score += features.playerMarks * TRAINED_WEIGHTS.playerMarks;
-  score += features.opponentMarks * TRAINED_WEIGHTS.opponentMarks;
-  score += features.playerTwoInRow * TRAINED_WEIGHTS.playerTwoInRow;
-  score += features.opponentTwoInRow * TRAINED_WEIGHTS.opponentTwoInRow;
-  score += features.playerOneInRow * TRAINED_WEIGHTS.playerOneInRow;
-  score += features.opponentOneInRow * TRAINED_WEIGHTS.opponentOneInRow;
-  score += features.centerControl * TRAINED_WEIGHTS.centerControl;
-  score += features.playerCorners * TRAINED_WEIGHTS.playerCorners;
-  score += features.opponentCorners * TRAINED_WEIGHTS.opponentCorners;
+  // Calculate score using trained weights
+  let score = MODEL_WEIGHTS.bias;
+  
+  // If evaluating for X, use features as-is
+  // If evaluating for O, flip the perspective
+  if (player === 'X') {
+    for (let i = 0; i < features.length && i < MODEL_WEIGHTS.weights.length; i++) {
+      score += features[i] * MODEL_WEIGHTS.weights[i];
+    }
+  } else {
+    // For O, flip X and O features
+    const flipped = [
+      features[1],  // O count
+      features[0],  // X count  
+      features[3],  // O almost win
+      features[2],  // X almost win
+      features[4],  // center (approximate)
+      features[5]   // corners
+    ];
+    for (let i = 0; i < flipped.length && i < MODEL_WEIGHTS.weights.length; i++) {
+      score += flipped[i] * MODEL_WEIGHTS.weights[i];
+    }
+  }
   
   // Normalize score to reasonable range
   return Math.max(-90, Math.min(90, score));
@@ -106,27 +150,27 @@ export const getMLConfig = (difficulty) => {
   switch (difficulty) {
     case 'easy':
       return {
-        depth: 2,
+        depth: 1, // Very shallow for easy mode
         evaluator: mlEvaluate,
-        noiseLevel: 0.3, // Add randomness for easier play
+        noiseLevel: 0.3,
       };
     case 'normal':
       return {
-        depth: 4,
-        evaluator: mlEvaluateAdvanced,
-        noiseLevel: 0.1,
+        depth: 3,
+        evaluator: mlEvaluate,
+        noiseLevel: 0,
       };
     case 'hard':
       return {
         depth: 9,
-        evaluator: mlEvaluateAdvanced,
+        evaluator: mlEvaluate,
         noiseLevel: 0,
       };
     default:
       return {
-        depth: 4,
+        depth: 3,
         evaluator: mlEvaluate,
-        noiseLevel: 0.1,
+        noiseLevel: 0,
       };
   }
 };

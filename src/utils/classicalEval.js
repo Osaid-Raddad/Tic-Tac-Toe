@@ -119,12 +119,12 @@ const evaluateForks = (board, player) => {
 export const getClassicalDepth = (difficulty) => {
   switch (difficulty) {
     case 'easy':
-      return 2; // Shallow search, makes mistakes
+      return 1; // Very shallow search, makes many mistakes
     case 'normal':
-      return 4; // Moderate search
+      return 3; // Moderate search
     case 'hard':
       return 9; // Full search (perfect play)
     default:
-      return 4;
+      return 3;
   }
 };

@@ -9,9 +9,10 @@ import {
 } from '../utils/gameLogic';
 import { findBestMove, getAllMoveEvaluations } from '../utils/alphaBeta';
 import { classicalEvaluate, getClassicalDepth } from '../utils/classicalEval';
-import { mlEvaluate, mlEvaluateAdvanced, getMLConfig } from '../utils/mlEval';
+import { mlEvaluate, getMLConfig, updateMLWeights, loadSavedWeights } from '../utils/mlEval';
 import GameSettings from './GameSettings';
 import MoveEvaluator from './MoveEvaluator';
+import DatasetTrainer from './DatasetTrainer';
 
 const TicTacToe = () => {
   const [board, setBoard] = useState(createEmptyBoard());
@@ -30,6 +31,12 @@ const TicTacToe = () => {
   const [showEvaluations, setShowEvaluations] = useState(true);
   const [thinking, setThinking] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
+  const [showTrainer, setShowTrainer] = useState(false);
+
+  // Load saved ML weights on mount
+  useEffect(() => {
+    loadSavedWeights();
+  }, []);
 
   // Reset game
   const resetGame = () => {
@@ -51,6 +58,19 @@ const TicTacToe = () => {
     // If AI plays first (X), make AI move
     if (config.aiPlayer === 'X') {
       setTimeout(() => makeAIMove(createEmptyBoard(), 'X', config), 500);
+    } else {
+      // Human plays first, show initial evaluations
+      setTimeout(() => {
+        const evaluationFunc = getEvaluationFunction(config);
+        const depth = getSearchDepth(config);
+        const initialEvals = getAllMoveEvaluations(
+          createEmptyBoard(),
+          config.aiPlayer,
+          evaluationFunc,
+          depth
+        );
+        setMoveEvaluations(initialEvals);
+      }, 100);
     }
   };
 
@@ -58,10 +78,8 @@ const TicTacToe = () => {
   const getEvaluationFunction = (config) => {
     if (config.evaluationType === 'classical') {
       return classicalEvaluate;
-    } else if (config.evaluationType === 'ml-basic') {
-      return mlEvaluate;
     } else {
-      return mlEvaluateAdvanced;
+      return mlEvaluate;
     }
   };
 
@@ -86,7 +104,8 @@ const TicTacToe = () => {
         currentBoard,
         player,
         evaluationFunc,
-        depth
+        depth,
+        config.difficulty
       );
       
       if (bestMove !== null) {
@@ -98,19 +117,18 @@ const TicTacToe = () => {
         const terminal = isTerminal(newBoard);
         if (terminal.terminal) {
           handleGameEnd(terminal);
+          setMoveEvaluations([]);
         } else {
           setCurrentPlayer(getOpponent(player));
           
-          // Show evaluations for human's turn
-          if (showEvaluations && getOpponent(player) === config.humanPlayer) {
-            const humanEvals = getAllMoveEvaluations(
-              newBoard,
-              config.aiPlayer,
-              evaluationFunc,
-              depth
-            );
-            setMoveEvaluations(humanEvals);
-          }
+          // Update evaluations for human's next turn
+          const humanEvals = getAllMoveEvaluations(
+            newBoard,
+            config.aiPlayer,
+            evaluationFunc,
+            depth
+          );
+          setMoveEvaluations(humanEvals);
         }
       }
       
@@ -128,13 +146,11 @@ const TicTacToe = () => {
     setBoard(newBoard);
     setMoveHistory([...moveHistory, { player: currentPlayer, move: index, board: newBoard }]);
     
-    // Clear evaluations when human makes a move
-    setMoveEvaluations([]);
-    
     // Check game status
     const terminal = isTerminal(newBoard);
     if (terminal.terminal) {
       handleGameEnd(terminal);
+      setMoveEvaluations([]);
     } else {
       setCurrentPlayer(getOpponent(currentPlayer));
       // AI's turn
@@ -146,16 +162,16 @@ const TicTacToe = () => {
   const handleGameEnd = (terminal) => {
     if (terminal.winner === 'draw') {
       setGameStatus('draw');
-      toast.info('Game ended in a draw!', { position: 'top-center' });
+      toast.info('Game ended in a draw!');
     } else {
       setGameStatus('won');
       setWinner(terminal.winner);
       setWinningLine(terminal.line);
       
       if (terminal.winner === gameConfig.humanPlayer) {
-        toast.success('🎉 You won!', { position: 'top-center' });
+        toast.success('🎉 You won!');
       } else {
-        toast.error('AI won! Better luck next time.', { position: 'top-center' });
+        toast.error('AI won! Better luck next time.');
       }
     }
   };
@@ -247,14 +263,10 @@ const TicTacToe = () => {
                 ⚙️ Settings
               </button>
               <button
-                onClick={() => setShowEvaluations(!showEvaluations)}
-                className={`px-6 py-3 font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105 ${
-                  showEvaluations
-                    ? 'bg-linear-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600'
-                    : 'bg-linear-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
-                } text-white`}
+                onClick={() => setShowTrainer(true)}
+                className="px-6 py-3 bg-linear-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
               >
-                {showEvaluations ? '👁️ Hide Scores' : '👁️ Show Scores'}
+                🤖 Train Model
               </button>
             </div>
 
@@ -280,9 +292,7 @@ const TicTacToe = () => {
                   <span className="capitalize">
                     {gameConfig.evaluationType === 'classical'
                       ? 'Classical Heuristic'
-                      : gameConfig.evaluationType === 'ml-basic'
-                      ? 'ML Basic'
-                      : 'ML Advanced'}
+                      : 'Machine Learning'}
                   </span>
                 </p>
               </div>
@@ -290,7 +300,7 @@ const TicTacToe = () => {
           </div>
 
           {/* Move Evaluations */}
-          {showEvaluations && moveEvaluations.length > 0 && (
+          {moveEvaluations.length > 0 && (
             <MoveEvaluator evaluations={moveEvaluations} board={board} />
           )}
         </div>
@@ -298,6 +308,14 @@ const TicTacToe = () => {
         {/* Settings Modal */}
         {showSettings && (
           <GameSettings onStart={startGame} onClose={() => setShowSettings(false)} />
+        )}
+
+        {/* Dataset Trainer Modal */}
+        {showTrainer && (
+          <DatasetTrainer 
+            onModelTrained={updateMLWeights} 
+            onClose={() => setShowTrainer(false)} 
+          />
         )}
       </div>
     </div>

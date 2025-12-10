@@ -120,25 +120,10 @@ const GameSettings = ({ onStart, onClose }) => {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span>🤖 ML Basic</span>
+                  <span>🤖 Machine Learning</span>
                   {evaluationType === 'ml-basic' && <span>✓</span>}
                 </div>
-                <p className="text-xs mt-1 opacity-80">Linear feature-based model</p>
-              </button>
-
-              <button
-                onClick={() => setEvaluationType('ml-advanced')}
-                className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 text-left ${
-                  evaluationType === 'ml-advanced'
-                    ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>🚀 ML Advanced</span>
-                  {evaluationType === 'ml-advanced' && <span>✓</span>}
-                </div>
-                <p className="text-xs mt-1 opacity-80">Non-linear with interactions</p>
+                <p className="text-xs mt-1 opacity-80">Feature-based trained model</p>
               </button>
             </div>
           </div>
