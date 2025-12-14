@@ -1,6 +1,27 @@
 /**
  * Machine Learning-Based Evaluation Function
- * Uses trained weights based on game features
+ * 
+ * MACHINE-LEARNED EVALUATION:
+ * This evaluation function uses weights trained from a real dataset of 2,014 Tic-Tac-Toe games.
+ * 
+ * Training Process:
+ * - Dataset: tictactoe_dataset.csv (2,014 game outcomes)
+ * - Algorithm: Linear regression with gradient descent
+ * - Features: 6 features extracted from board state (see featureExtractor.js)
+ * - Labels: +1 if X eventually wins, -1 if O wins
+ * 
+ * Features used for prediction:
+ * 1. Number of X marks on board (0-9)
+ * 2. Number of O marks on board (0-9)
+ * 3. Number of rows/columns/diagonals where X is close to winning (has 2 marks + 1 empty)
+ * 4. Number of rows/columns/diagonals where O is close to winning (has 2 marks + 1 empty)
+ * 5. Whether X controls the center position (binary: 0 or 1)
+ * 6. Number of corners controlled by X (0-4)
+ * 
+ * The model learns optimal weights for these features through training, allowing it to
+ * predict game outcomes based on patterns learned from thousands of real games.
+ * 
+ * Users can train their own model by clicking "Train Model" button in the game.
  */
 
 import { isTerminal, getOpponent } from './gameLogic';

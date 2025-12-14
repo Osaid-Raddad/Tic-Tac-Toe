@@ -10,6 +10,7 @@ import {
 import { findBestMove, getAllMoveEvaluations } from '../utils/alphaBeta';
 import { classicalEvaluate, getClassicalDepth } from '../utils/classicalEval';
 import { mlEvaluate, getMLConfig, updateMLWeights, loadSavedWeights } from '../utils/mlEval';
+import { saveGameToHistory } from '../utils/gameHistory';
 import GameSettings from './GameSettings';
 import MoveEvaluator from './MoveEvaluator';
 import DatasetTrainer from './DatasetTrainer';
@@ -167,6 +168,9 @@ const TicTacToe = () => {
       setGameStatus('won');
       setWinner(terminal.winner);
       setWinningLine(terminal.line);
+      
+      // Save game to history for ML training
+      saveGameToHistory(moveHistory, terminal.winner);
       
       if (terminal.winner === gameConfig.humanPlayer) {
         toast.success('🎉 You won!');

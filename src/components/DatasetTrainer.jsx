@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { loadDatasetFromURL, splitDataset, getDatasetStats } from '../utils/datasetLoader';
 import { trainLinearModel, calculateAccuracy, analyzeFeatureImportance } from '../utils/modelTrainer';
+import { getGameHistory, getHistoryStats } from '../utils/gameHistory';
 import { toast } from 'react-toastify';
 
 const DatasetTrainer = ({ onModelTrained, onClose }) => {
@@ -17,14 +18,35 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
       toast.info('Loading dataset...');
       const dataset = await loadDatasetFromURL('/tictactoe_dataset.csv');
       
-      // Get dataset statistics
-      const stats = getDatasetStats(dataset);
+      // Load played games from history
+      const playedGames = getGameHistory();
+      const historyStats = getHistoryStats();
+      
+      // Combine dataset with played games
+      let combinedFeatures = [...dataset.features];
+      let combinedLabels = [...dataset.labels];
+      
+      if (playedGames.length > 0) {
+        playedGames.forEach(game => {
+          combinedFeatures.push(game.features);
+          combinedLabels.push(game.label);
+        });
+        toast.info(`Added ${playedGames.length} played games to training data!`);
+      }
+      
+      // Get combined statistics
+      const stats = {
+        ...getDatasetStats(dataset),
+        playedGames: historyStats.totalGames,
+        totalSamples: combinedFeatures.length
+      };
       setDatasetStats(stats);
       
       // Split into train and test
-      const { train, test } = splitDataset(dataset, 0.2);
+      const combinedDataset = { features: combinedFeatures, labels: combinedLabels };
+      const { train, test } = splitDataset(combinedDataset, 0.2);
       
-      toast.info(`Training on ${train.features.length} samples...`);
+      toast.info(`Training on ${train.features.length} samples (${playedGames.length} from gameplay)...`);
       
       // Train the model
       const model = trainLinearModel(train.features, train.labels, {
@@ -47,7 +69,8 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
         testAccuracy,
         featureImportance,
         trainingSize: train.features.length,
-        testingSize: test.features.length
+        testingSize: test.features.length,
+        playedGamesCount: playedGames.length
       };
       
       setTrainingResults(results);
@@ -77,7 +100,21 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
         {/* Header */}
         <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-white mb-2">🤖 Train ML Model</h2>
-          <p className="text-gray-400">Train the AI using the Tic-Tac-Toe dataset</p>
+          <p className="text-gray-400">Train AI using dataset + your played games</p>
+          <p className="text-xs text-gray-500 mt-2">Labels: +1 (X wins), -1 (O wins)</p>
+        </div>
+
+        {/* Feature Information */}
+        <div className="mb-6 bg-gray-800/50 p-4 rounded-xl">
+          <h3 className="text-lg font-semibold text-purple-400 mb-3">📊 Training Features</h3>
+          <div className="text-sm text-gray-300 space-y-1">
+            <p>✓ <span className="font-semibold">Feature 1:</span> Number of X marks</p>
+            <p>✓ <span className="font-semibold">Feature 2:</span> Number of O marks</p>
+            <p>✓ <span className="font-semibold">Feature 3:</span> Rows/columns/diagonals where X is close to winning</p>
+            <p>✓ <span className="font-semibold">Feature 4:</span> Rows/columns/diagonals where O is close to winning</p>
+            <p>✓ <span className="font-semibold">Feature 5:</span> X in center position</p>
+            <p>✓ <span className="font-semibold">Feature 6:</span> Number of corners controlled by X</p>
+          </div>
         </div>
 
         {/* Dataset Info */}
@@ -90,8 +127,8 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
                 <p className="text-white font-bold text-xl">{datasetStats.totalSamples}</p>
               </div>
               <div>
-                <p className="text-gray-400">Class Balance</p>
-                <p className="text-white font-bold text-xl">{datasetStats.balance}</p>
+                <p className="text-gray-400">Played Games</p>
+                <p className="text-purple-400 font-bold text-xl">{datasetStats.playedGames || 0}</p>
               </div>
               <div>
                 <p className="text-gray-400">Positive (X wins)</p>
@@ -165,6 +202,11 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
                 <p>Bias: {trainingResults.model.bias.toFixed(4)}</p>
                 <p>Weights: [{trainingResults.model.featureWeights.map(w => w.toFixed(3)).join(', ')}]</p>
               </div>
+              {trainingResults.playedGamesCount > 0 && (
+                <p className="text-xs text-purple-400 mt-2">
+                  🎮 Trained with {trainingResults.playedGamesCount} games from your gameplay!
+                </p>
+              )}
             </div>
           </div>
         )}
