@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { loadDatasetFromURL, splitDataset, getDatasetStats } from '../utils/datasetLoader';
 import { trainLinearModel, calculateAccuracy, analyzeFeatureImportance } from '../utils/modelTrainer';
-import { getGameHistory, getHistoryStats } from '../utils/gameHistory';
+import { getGameHistory, getHistoryStats, clearGameHistory } from '../utils/gameHistory';
 import { toast } from 'react-toastify';
 
 const DatasetTrainer = ({ onModelTrained, onClose }) => {
@@ -48,17 +48,55 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
       
       toast.info(`Training on ${train.features.length} samples (${playedGames.length} from gameplay)...`);
       
-      // Train the model
-      const model = trainLinearModel(train.features, train.labels, {
-        learningRate: 0.01,
-        epochs: 1000,
-        regularization: 0.001,
+      // Normalize features before training
+      const normalizeFeatures = (features) => {
+        const means = [];
+        const stds = [];
+        const normalized = [];
+        
+        // Calculate mean and std for each feature
+        for (let j = 0; j < features[0].length; j++) {
+          const values = features.map(f => f[j]);
+          const mean = values.reduce((a, b) => a + b, 0) / values.length;
+          const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
+          const std = Math.sqrt(variance) || 1; // Avoid division by zero
+          means.push(mean);
+          stds.push(std);
+        }
+        
+        // Normalize each sample
+        for (let i = 0; i < features.length; i++) {
+          const normalizedSample = [];
+          for (let j = 0; j < features[i].length; j++) {
+            normalizedSample.push((features[i][j] - means[j]) / stds[j]);
+          }
+          normalized.push(normalizedSample);
+        }
+        
+        return { normalized, means, stds };
+      };
+      
+      // Normalize training and test data
+      const { normalized: normalizedTrain, means, stds } = normalizeFeatures(train.features);
+      const normalizedTest = test.features.map((sample, i) => 
+        sample.map((val, j) => (val - means[j]) / stds[j])
+      );
+      
+      // Train the model with normalized features
+      const model = trainLinearModel(normalizedTrain, train.labels, {
+        learningRate: 0.1,       // More aggressive learning
+        epochs: 3000,            // More epochs
+        regularization: 0.00001, // Minimal regularization
         verbose: false
       });
       
-      // Test the model
-      const trainAccuracy = calculateAccuracy(train.features, train.labels, model.weights);
-      const testAccuracy = calculateAccuracy(test.features, test.labels, model.weights);
+      // Store normalization parameters with model
+      model.means = means;
+      model.stds = stds;
+      
+      // Test the model with normalized features
+      const trainAccuracy = calculateAccuracy(normalizedTrain, train.labels, model.weights);
+      const testAccuracy = calculateAccuracy(normalizedTest, test.labels, model.weights);
       
       // Analyze feature importance
       const featureImportance = analyzeFeatureImportance(model.weights, dataset.headers);
@@ -91,6 +129,17 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
       onModelTrained(trainingResults.model);
       toast.success('Model activated! AI now uses trained weights.');
       onClose();
+    }
+  };
+
+  const handleResetModel = () => {
+    if (window.confirm('Reset ML model and clear all played games?\n\nThis will:\n✓ Reset model to default weights\n✓ Delete all saved game history\n✓ Return sample count to 2,014 (original dataset)')) {
+      localStorage.removeItem('ml_model');
+      clearGameHistory();
+      toast.info('Model and game history reset! Refreshing...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     }
   };
 
@@ -218,6 +267,13 @@ const DatasetTrainer = ({ onModelTrained, onClose }) => {
             className="flex-1 py-3 px-6 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-300"
           >
             Cancel
+          </button>
+          
+          <button
+            onClick={handleResetModel}
+            className="flex-1 py-3 px-6 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+          >
+            🗑️ Reset Model
           </button>
           
           {!trained ? (

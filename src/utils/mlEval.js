@@ -33,7 +33,9 @@ import { extractDatasetFeatures } from './featureExtractor';
  */
 let MODEL_WEIGHTS = {
   bias: 0.5,
-  weights: [2.5, -2.5, 18.0, -22.0, 6.0, 3.5] // Default weights
+  weights: [2.5, -2.5, 18.0, -22.0, 6.0, 3.5], // Default weights
+  means: null,  // Feature normalization means
+  stds: null    // Feature normalization standard deviations
 };
 
 /**
@@ -44,7 +46,9 @@ export const updateMLWeights = (model) => {
   if (model && model.featureWeights && model.featureWeights.length >= 6) {
     MODEL_WEIGHTS = {
       bias: model.bias || 0,
-      weights: model.featureWeights
+      weights: model.featureWeights,
+      means: model.means || null,
+      stds: model.stds || null
     };
     
     // Save to localStorage for persistence
@@ -95,24 +99,32 @@ export const mlEvaluate = (board, player) => {
   // Extract features matching dataset format
   const features = extractDatasetFeatures(board, player);
   
+  // Normalize features if normalization parameters are available
+  let normalizedFeatures = features;
+  if (MODEL_WEIGHTS.means && MODEL_WEIGHTS.stds) {
+    normalizedFeatures = features.map((val, i) => 
+      (val - MODEL_WEIGHTS.means[i]) / MODEL_WEIGHTS.stds[i]
+    );
+  }
+  
   // Calculate score using trained weights
   let score = MODEL_WEIGHTS.bias;
   
   // If evaluating for X, use features as-is
   // If evaluating for O, flip the perspective
   if (player === 'X') {
-    for (let i = 0; i < features.length && i < MODEL_WEIGHTS.weights.length; i++) {
-      score += features[i] * MODEL_WEIGHTS.weights[i];
+    for (let i = 0; i < normalizedFeatures.length && i < MODEL_WEIGHTS.weights.length; i++) {
+      score += normalizedFeatures[i] * MODEL_WEIGHTS.weights[i];
     }
   } else {
     // For O, flip X and O features
     const flipped = [
-      features[1],  // O count
-      features[0],  // X count  
-      features[3],  // O almost win
-      features[2],  // X almost win
-      features[4],  // center (approximate)
-      features[5]   // corners
+      normalizedFeatures[1],  // O count
+      normalizedFeatures[0],  // X count  
+      normalizedFeatures[3],  // O almost win
+      normalizedFeatures[2],  // X almost win
+      normalizedFeatures[4],  // center (approximate)
+      normalizedFeatures[5]   // corners
     ];
     for (let i = 0; i < flipped.length && i < MODEL_WEIGHTS.weights.length; i++) {
       score += flipped[i] * MODEL_WEIGHTS.weights[i];

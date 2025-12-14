@@ -34,9 +34,20 @@ const TicTacToe = () => {
   const [moveHistory, setMoveHistory] = useState([]);
   const [showTrainer, setShowTrainer] = useState(false);
 
-  // Load saved ML weights on mount
+  // Load saved ML weights and game settings on mount
   useEffect(() => {
     loadSavedWeights();
+    
+    // Load saved game settings
+    const savedSettings = localStorage.getItem('game_settings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setGameConfig(settings);
+      } catch (error) {
+        console.error('Failed to load saved settings:', error);
+      }
+    }
   }, []);
 
   // Reset game
@@ -50,9 +61,24 @@ const TicTacToe = () => {
     setMoveHistory([]);
   };
 
+  // Reset settings to default
+  const resetSettings = () => {
+    const defaultConfig = {
+      humanPlayer: 'X',
+      aiPlayer: 'O',
+      difficulty: 'normal',
+      evaluationType: 'classical',
+    };
+    setGameConfig(defaultConfig);
+    localStorage.setItem('game_settings', JSON.stringify(defaultConfig));
+    toast.info('Settings reset to defaults!');
+  };
+
   // Start new game with settings
   const startGame = (config) => {
     setGameConfig(config);
+    // Save settings to localStorage
+    localStorage.setItem('game_settings', JSON.stringify(config));
     setShowSettings(false);
     resetGame();
     
@@ -267,6 +293,12 @@ const TicTacToe = () => {
                 ⚙️ Settings
               </button>
               <button
+                onClick={resetSettings}
+                className="px-6 py-3 bg-linear-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+              >
+                🔧 Reset Settings
+              </button>
+              <button
                 onClick={() => setShowTrainer(true)}
                 className="px-6 py-3 bg-linear-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
               >
@@ -311,7 +343,11 @@ const TicTacToe = () => {
 
         {/* Settings Modal */}
         {showSettings && (
-          <GameSettings onStart={startGame} onClose={() => setShowSettings(false)} />
+          <GameSettings 
+            currentConfig={gameConfig}
+            onStart={startGame} 
+            onClose={() => setShowSettings(false)} 
+          />
         )}
 
         {/* Dataset Trainer Modal */}

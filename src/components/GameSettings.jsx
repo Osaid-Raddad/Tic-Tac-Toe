@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
-const GameSettings = ({ onStart, onClose }) => {
-  const [humanPlayer, setHumanPlayer] = useState('X');
-  const [difficulty, setDifficulty] = useState('normal');
-  const [evaluationType, setEvaluationType] = useState('classical');
+const GameSettings = ({ currentConfig, onStart, onClose }) => {
+  const [humanPlayer, setHumanPlayer] = useState(currentConfig?.humanPlayer || 'X');
+  const [difficulty, setDifficulty] = useState(currentConfig?.difficulty || 'normal');
+  const [evaluationType, setEvaluationType] = useState(currentConfig?.evaluationType || 'classical');
 
   const handleStart = () => {
     const config = {

@@ -131,6 +131,12 @@ export const findBestMove = (board, aiPlayer, evaluateFunction, maxDepth, diffic
     const randomIndex = Math.floor(Math.random() * Math.min(3, sorted.length));
     bestMove = sorted[randomIndex].move;
   }
+  // Normal mode: Occasionally (15% chance) pick second-best move to be beatable
+  else if (difficulty === 'normal' && Math.random() < 0.15 && moveEvaluations.length > 1) {
+    const sorted = [...moveEvaluations].sort((a, b) => b.value - a.value);
+    // Pick second best move
+    bestMove = sorted[1].move;
+  }
   
   return { bestMove, bestValue, moveEvaluations };
 };
